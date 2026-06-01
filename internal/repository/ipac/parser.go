@@ -6,14 +6,20 @@ import (
 	"net/url"
 	"strings"
 
+	"golang.org/x/text/encoding/charmap"
+
 	"github.com/joao-carmo/blx/internal/service"
 )
 
 // parseRSS parses RSS XML bytes into a slice of SearchItem.
-// It strips the XML declaration to avoid encoding issues (the feed
-// declares ISO-8859-1 but Go's xml package only supports UTF-8).
+// The iPAC feed uses ISO-8859-1 encoding, so we convert to UTF-8 first,
+// then strip the XML declaration (Go's xml package only supports UTF-8).
 func parseRSS(data []byte) ([]service.SearchItem, error) {
-	cleaned := stripXMLDeclaration(data)
+	utf8Data, err := decodeISO8859(data)
+	if err != nil {
+		return nil, fmt.Errorf("decode ISO-8859-1: %w", err)
+	}
+	cleaned := stripXMLDeclaration(utf8Data)
 
 	var rss rssResponse
 	if err := xml.Unmarshal(cleaned, &rss); err != nil {
@@ -33,6 +39,11 @@ func parseRSS(data []byte) ([]service.SearchItem, error) {
 	}
 
 	return items, nil
+}
+
+// decodeISO8859 converts ISO-8859-1 bytes to UTF-8.
+func decodeISO8859(data []byte) ([]byte, error) {
+	return charmap.ISO8859_1.NewDecoder().Bytes(data)
 }
 
 // stripXMLDeclaration removes the <?xml ...?> processing instruction.
