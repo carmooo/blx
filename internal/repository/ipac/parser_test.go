@@ -86,3 +86,78 @@ func TestStripXMLDeclaration(t *testing.T) {
 	result := stripXMLDeclaration(input)
 	assert.Equal(t, "<rss>content</rss>", string(result))
 }
+
+func TestParseMarcXML(t *testing.T) {
+	data, err := os.ReadFile("../../../testdata/marcxml_item.xml")
+	require.NoError(t, err)
+
+	item, err := parseMarcXML(data)
+	require.NoError(t, err)
+
+	assert.Equal(t, "Relação do reino de Congo e das terras circunvizinhas", item.Title)
+	assert.Equal(t, "1949", item.Year)
+	assert.Equal(t, "Lisboa", item.Place)
+	assert.Equal(t, "Agência Geral das Colónias", item.Publisher)
+	assert.Equal(t, "ita", item.Language)
+	assert.Equal(t, "Ed. fac-similada", item.Edition)
+	assert.Equal(t, "136 p., pag. var. ; 8 grav. desdobr., 2 map. desdobr. ; 25 cm", item.Physical)
+	assert.Equal(t, "910.4(673+675)\"15\"", item.Classification)
+
+	// Authors: at least 2 (700 + 701).
+	require.GreaterOrEqual(t, len(item.Authors), 2)
+	assert.Equal(t, "Lopes, Duarte", item.Authors[0].Name)
+	assert.Equal(t, "fl. 1578", item.Authors[0].Dates)
+	assert.Equal(t, "author", item.Authors[0].Role)
+
+	assert.Equal(t, "Pigafetta, Filippo", item.Authors[1].Name)
+	assert.Equal(t, "author", item.Authors[1].Role)
+
+	// Contributor (702).
+	require.Len(t, item.Authors, 3)
+	assert.Equal(t, "Capeans, Rosa", item.Authors[2].Name)
+	assert.Equal(t, "contributor", item.Authors[2].Role)
+
+	// Subjects.
+	require.Len(t, item.Subjects, 1)
+	assert.Contains(t, item.Subjects[0], "Reino do Congo")
+	assert.Contains(t, item.Subjects[0], "Séc. 16")
+	assert.Contains(t, item.Subjects[0], "[Narrativas de viagens]")
+}
+
+func TestParseMarcXML_EmptyCollection(t *testing.T) {
+	data := []byte(`<collection></collection>`)
+	_, err := parseMarcXML(data)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no records")
+}
+
+func TestParseHoldings(t *testing.T) {
+	data, err := os.ReadFile("../../../testdata/holdings_detail.html")
+	require.NoError(t, err)
+
+	holdings, err := parseHoldings(data)
+	require.NoError(t, err)
+
+	require.Len(t, holdings, 3)
+
+	assert.Equal(t, "Biblioteca Camões", holdings[0].Branch)
+	assert.Equal(t, "910.4 LOP", holdings[0].CallNumber)
+	assert.Equal(t, "Fundo Geral", holdings[0].Collection)
+	assert.Equal(t, "Disponível", holdings[0].Status)
+	assert.Equal(t, 15, holdings[0].LoanDays)
+
+	assert.Equal(t, "Biblioteca de Belém", holdings[1].Branch)
+	assert.Equal(t, "Emprestado", holdings[1].Status)
+
+	assert.Equal(t, "Biblioteca Palácio Galveias", holdings[2].Branch)
+	assert.Equal(t, "Reservados", holdings[2].Collection)
+	assert.Equal(t, "Presença", holdings[2].Status)
+	assert.Equal(t, 0, holdings[2].LoanDays) // empty loan days
+}
+
+func TestParseHoldings_NoTable(t *testing.T) {
+	data := []byte(`<html><body><p>No holdings here</p></body></html>`)
+	holdings, err := parseHoldings(data)
+	require.NoError(t, err)
+	assert.Empty(t, holdings)
+}

@@ -1,11 +1,14 @@
 package ipac
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/text/encoding/charmap"
 
 	"github.com/joao-carmo/blx/internal/service"
@@ -46,6 +49,17 @@ func decodeISO8859(data []byte) ([]byte, error) {
 	return charmap.ISO8859_1.NewDecoder().Bytes(data)
 }
 
+// hasISO8859Declaration checks if the XML data declares ISO-8859-1 encoding.
+func hasISO8859Declaration(data []byte) bool {
+	// Check the first 100 bytes for the encoding declaration.
+	header := string(data)
+	if len(header) > 100 {
+		header = header[:100]
+	}
+	header = strings.ToLower(header)
+	return strings.Contains(header, "iso-8859-1") || strings.Contains(header, "iso_8859_1")
+}
+
 // stripXMLDeclaration removes the <?xml ...?> processing instruction.
 func stripXMLDeclaration(data []byte) []byte {
 	s := string(data)
@@ -75,4 +89,202 @@ func extractID(link string) (string, error) {
 	}
 
 	return id, nil
+}
+
+// parseMarcXML parses MarcXchange XML (UNIMARC format) into a service.Item.
+func parseMarcXML(data []byte) (*service.Item, error) {
+	cleaned := data
+	if hasISO8859Declaration(data) {
+		utf8Data, err := decodeISO8859(data)
+		if err != nil {
+			return nil, fmt.Errorf("decode ISO-8859-1: %w", err)
+		}
+		cleaned = utf8Data
+	}
+	cleaned = stripXMLDeclaration(cleaned)
+
+	var collection marcCollection
+	if err := xml.Unmarshal(cleaned, &collection); err != nil {
+		return nil, fmt.Errorf("unmarshal MarcXML: %w", err)
+	}
+
+	if len(collection.Records) == 0 {
+		return nil, fmt.Errorf("no records found in MarcXML")
+	}
+
+	rec := collection.Records[0]
+	item := &service.Item{}
+
+	for _, df := range rec.DataFields {
+		subs := subfieldsMap(df.Subfields)
+		switch df.Tag {
+		case "010":
+			item.ISBN = subs["a"]
+		case "101":
+			item.Language = subs["a"]
+		case "200":
+			item.Title = subs["a"]
+		case "205":
+			item.Edition = subs["a"]
+		case "210":
+			item.Place = subs["a"]
+			item.Publisher = subs["c"]
+			item.Year = subs["d"]
+		case "215":
+			parts := collectSubfields(df.Subfields, "a", "c", "d")
+			if len(parts) > 0 {
+				item.Physical = strings.Join(parts, " ; ")
+			}
+		case "606", "607":
+			parts := collectSubfields(df.Subfields, "a", "z", "j")
+			if len(parts) > 0 {
+				item.Subjects = append(item.Subjects, strings.Join(parts, " -- "))
+			}
+		case "675":
+			item.Classification = subs["a"]
+		case "700", "701":
+			item.Authors = append(item.Authors, buildAuthor(df.Subfields, "author"))
+		case "702":
+			item.Authors = append(item.Authors, buildAuthor(df.Subfields, "contributor"))
+		}
+	}
+
+	// Trim trailing comma from publisher.
+	item.Publisher = strings.TrimRight(item.Publisher, ", ")
+
+	return item, nil
+}
+
+// subfieldsMap returns a map from subfield code to value (first occurrence wins).
+func subfieldsMap(subs []marcSubfield) map[string]string {
+	m := make(map[string]string, len(subs))
+	for _, s := range subs {
+		if _, exists := m[s.Code]; !exists {
+			m[s.Code] = s.Value
+		}
+	}
+	return m
+}
+
+// collectSubfields returns the values of subfields matching the given codes, in order.
+func collectSubfields(subs []marcSubfield, codes ...string) []string {
+	codeSet := make(map[string]bool, len(codes))
+	for _, c := range codes {
+		codeSet[c] = true
+	}
+	var parts []string
+	for _, s := range subs {
+		if codeSet[s.Code] && s.Value != "" {
+			parts = append(parts, s.Value)
+		}
+	}
+	return parts
+}
+
+// buildAuthor constructs an Author from MARC subfields.
+func buildAuthor(subs []marcSubfield, role string) service.Author {
+	m := subfieldsMap(subs)
+	name := strings.TrimRight(m["a"], ", ")
+	forename := strings.TrimRight(m["b"], ", ")
+	if forename != "" {
+		name = name + ", " + forename
+	}
+	return service.Author{
+		Name:  name,
+		Dates: m["f"],
+		Role:  role,
+	}
+}
+
+// parseHoldings parses iPAC HTML detail page to extract holdings information.
+func parseHoldings(data []byte) ([]service.Holding, error) {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("parse HTML: %w", err)
+	}
+
+	var holdings []service.Holding
+
+	// Find the holdings table by looking for header rows with Portuguese keywords.
+	doc.Find("table").Each(func(_ int, table *goquery.Selection) {
+		if len(holdings) > 0 {
+			return // already found
+		}
+
+		// Try to find a header row that identifies the holdings table.
+		colMap := map[string]int{}
+		headerRowIdx := -1
+
+		table.Find("tr").Each(func(rowIdx int, tr *goquery.Selection) {
+			if headerRowIdx >= 0 {
+				return
+			}
+			text := tr.Text()
+			hasLocation := strings.Contains(text, "Localiza")
+			hasCota := strings.Contains(text, "Cota")
+			if hasLocation || hasCota {
+				// Map column positions.
+				tr.Find("td, th").Each(func(colIdx int, cell *goquery.Selection) {
+					cellText := strings.TrimSpace(cell.Text())
+					switch {
+					case strings.Contains(cellText, "Localiza"):
+						colMap["branch"] = colIdx
+					case strings.Contains(cellText, "Cota"):
+						colMap["callnumber"] = colIdx
+					case strings.Contains(cellText, "Cole") || strings.Contains(cellText, "Coleção"):
+						colMap["collection"] = colIdx
+					case strings.Contains(cellText, "Estado") || strings.Contains(cellText, "Situa"):
+						colMap["status"] = colIdx
+					case strings.Contains(cellText, "Empr") || strings.Contains(cellText, "dias"):
+						colMap["loandays"] = colIdx
+					}
+				})
+				if len(colMap) >= 2 {
+					headerRowIdx = rowIdx
+				}
+			}
+		})
+
+		if headerRowIdx < 0 {
+			return
+		}
+
+		// Parse data rows after the header.
+		table.Find("tr").Each(func(rowIdx int, tr *goquery.Selection) {
+			if rowIdx <= headerRowIdx {
+				return
+			}
+			cells := tr.Find("td, th")
+			if cells.Length() == 0 {
+				return
+			}
+
+			h := service.Holding{}
+			if idx, ok := colMap["branch"]; ok && idx < cells.Length() {
+				h.Branch = strings.TrimSpace(cells.Eq(idx).Text())
+			}
+			if idx, ok := colMap["callnumber"]; ok && idx < cells.Length() {
+				h.CallNumber = strings.TrimSpace(cells.Eq(idx).Text())
+			}
+			if idx, ok := colMap["collection"]; ok && idx < cells.Length() {
+				h.Collection = strings.TrimSpace(cells.Eq(idx).Text())
+			}
+			if idx, ok := colMap["status"]; ok && idx < cells.Length() {
+				h.Status = strings.TrimSpace(cells.Eq(idx).Text())
+			}
+			if idx, ok := colMap["loandays"]; ok && idx < cells.Length() {
+				text := strings.TrimSpace(cells.Eq(idx).Text())
+				if days, err := strconv.Atoi(text); err == nil {
+					h.LoanDays = days
+				}
+			}
+
+			// Only add if we got meaningful data.
+			if h.Branch != "" || h.CallNumber != "" {
+				holdings = append(holdings, h)
+			}
+		})
+	})
+
+	return holdings, nil
 }
