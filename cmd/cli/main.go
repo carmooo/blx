@@ -69,7 +69,7 @@ func searchCmd() *cobra.Command {
 			}
 
 			if jsonOut {
-				return printSearchJSON(result)
+				return printJSON(result)
 			}
 			return printTable(result)
 		},
@@ -100,16 +100,10 @@ func printTable(result *service.SearchResult) error {
 	return w.Flush()
 }
 
-func printSearchJSON(result *service.SearchResult) error {
+func printJSON(v any) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	return enc.Encode(result)
-}
-
-func printItemJSON(item *service.Item) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(item)
+	return enc.Encode(v)
 }
 
 func itemCmd() *cobra.Command {
@@ -141,7 +135,7 @@ func itemCmd() *cobra.Command {
 			item.Holdings = holdings
 
 			if jsonOut {
-				return printItemJSON(item)
+				return printJSON(item)
 			}
 			return printItem(item)
 		},
