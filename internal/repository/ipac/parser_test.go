@@ -145,6 +145,8 @@ func TestParseHoldings(t *testing.T) {
 	assert.NotEmpty(t, first.CallNumber)
 	assert.NotEmpty(t, first.Collection)
 	assert.NotEmpty(t, first.Status)
+	assert.Equal(t, "29075", first.BibKey)
+	assert.Equal(t, "14393", first.ItemKey)
 }
 
 func TestParseHoldings_NoTable(t *testing.T) {

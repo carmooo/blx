@@ -270,12 +270,38 @@ func parseHoldings(data []byte) ([]service.Holding, error) {
 			}
 		}
 
+		// Extract bibkey and itemkey from reserve link in the row.
+		extractReservationKeys(sibling, &h)
+
 		if h.Branch != "" || h.CallNumber != "" {
 			holdings = append(holdings, h)
 		}
 	}
 
 	return holdings, nil
+}
+
+// extractReservationKeys finds an <a> with href containing "menu=request"
+// in the given row and extracts bibkey and itemkey query parameters.
+func extractReservationKeys(row *html.Node, h *service.Holding) {
+	var walk func(*html.Node)
+	walk = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, attr := range n.Attr {
+				if attr.Key == "href" && strings.Contains(attr.Val, "menu=request") {
+					if u, err := url.Parse(attr.Val); err == nil {
+						h.BibKey = u.Query().Get("bibkey")
+						h.ItemKey = u.Query().Get("itemkey")
+					}
+					return
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			walk(c)
+		}
+	}
+	walk(row)
 }
 
 // findHoldingsHeader walks the HTML tree to find the <tr> header row

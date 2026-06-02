@@ -63,6 +63,8 @@ type Holding struct {
 	Collection string `json:"collection"`
 	Status     string `json:"status"`
 	LoanDays   int    `json:"loan_days,omitempty"`
+	BibKey     string `json:"bib_key,omitempty"`
+	ItemKey    string `json:"item_key,omitempty"`
 }
 
 // Branch represents a library branch.
