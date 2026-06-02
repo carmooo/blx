@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
 	"golang.org/x/text/encoding/charmap"
 
 	"github.com/joao-carmo/blx/internal/service"
@@ -202,101 +202,68 @@ func buildAuthor(subs []marcSubfield, role string) service.Author {
 }
 
 // parseHoldings parses iPAC HTML detail page to extract holdings information.
-//
-// The real iPAC HTML structure is:
-//
-//	<table class="tableBackground">
-//	  <tr><td>
-//	    <table>                          ← inner table with actual rows
-//	      <tr> header cells (Local, Cota, Coleção, Prazo empréstimo, Estado, Data Devolução) </tr>
-//	      <tr> data cells </tr>
-//	    </table>
-//	  </td></tr>
-//	</table>
 func parseHoldings(data []byte) ([]service.Holding, error) {
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
+	doc, err := html.Parse(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("parse HTML: %w", err)
 	}
 
-	var holdings []service.Holding
-
-	// Find the header row containing holdings column names.
-	// We check direct child cells (not deeply nested text) to avoid matching
-	// outer wrapper rows that contain the entire page.
-	var headerRow *goquery.Selection
-	doc.Find("tr").Each(func(_ int, tr *goquery.Selection) {
-		if headerRow != nil {
-			return
-		}
-		directCells := tr.Children().Filter("td, th")
-		if directCells.Length() < 3 {
-			return
-		}
-		var cellTexts []string
-		directCells.Each(func(_ int, td *goquery.Selection) {
-			cellTexts = append(cellTexts, strings.TrimSpace(td.Text()))
-		})
-		joined := strings.Join(cellTexts, " ")
-		hasCota := strings.Contains(joined, "Cota")
-		hasLocal := strings.Contains(joined, "Local")
-		hasEstado := strings.Contains(joined, "Estado")
-		if hasCota && (hasLocal || hasEstado) {
-			headerRow = tr
-		}
-	})
-
+	// Find the header row: a <tr> whose direct <td>/<th> children contain "Cota" and "Local".
+	headerRow := findHoldingsHeader(doc)
 	if headerRow == nil {
-		return holdings, nil
+		return nil, nil
 	}
 
-	// Map column positions from header cells (direct children only).
+	// Map column positions from header cells.
 	colMap := map[string]int{}
-	headerRow.Children().Filter("td, th").Each(func(colIdx int, cell *goquery.Selection) {
-		cellText := strings.TrimSpace(cell.Text())
+	for i, cell := range directCells(headerRow) {
+		text := strings.TrimSpace(nodeText(cell))
 		switch {
-		case strings.Contains(cellText, "Local"):
-			colMap["branch"] = colIdx
-		case cellText == "Cota" || strings.HasPrefix(cellText, "Cota"):
-			colMap["callnumber"] = colIdx
-		case strings.Contains(cellText, "Cole"):
-			colMap["collection"] = colIdx
-		case strings.Contains(cellText, "Estado") || strings.Contains(cellText, "Situa"):
-			colMap["status"] = colIdx
-		case strings.Contains(cellText, "Prazo") || strings.Contains(cellText, "Empr"):
-			colMap["loandays"] = colIdx
-		case strings.Contains(cellText, "Devolu"):
-			colMap["duedate"] = colIdx
+		case strings.Contains(text, "Local"):
+			colMap["branch"] = i
+		case text == "Cota" || strings.HasPrefix(text, "Cota"):
+			colMap["callnumber"] = i
+		case strings.Contains(text, "Cole"):
+			colMap["collection"] = i
+		case strings.Contains(text, "Estado") || strings.Contains(text, "Situa"):
+			colMap["status"] = i
+		case strings.Contains(text, "Prazo") || strings.Contains(text, "Empr"):
+			colMap["loandays"] = i
+		case strings.Contains(text, "Devolu"):
+			colMap["duedate"] = i
 		}
-	})
+	}
 
 	if len(colMap) < 2 {
-		return holdings, nil
+		return nil, nil
 	}
 
-	// Parse sibling rows after the header (data rows).
-	headerRow.NextAll().Each(func(_ int, tr *goquery.Selection) {
-		cells := tr.Children().Filter("td, th")
-		if cells.Length() < 2 {
-			return
+	// Parse sibling <tr> rows after the header.
+	var holdings []service.Holding
+	for sibling := headerRow.NextSibling; sibling != nil; sibling = sibling.NextSibling {
+		if sibling.Type != html.ElementNode || sibling.Data != "tr" {
+			continue
+		}
+		cells := directCells(sibling)
+		if len(cells) < 2 {
+			continue
 		}
 
 		h := service.Holding{}
-		if idx, ok := colMap["branch"]; ok && idx < cells.Length() {
-			h.Branch = strings.TrimSpace(cells.Eq(idx).Text())
+		if idx, ok := colMap["branch"]; ok && idx < len(cells) {
+			h.Branch = strings.TrimSpace(nodeText(cells[idx]))
 		}
-		if idx, ok := colMap["callnumber"]; ok && idx < cells.Length() {
-			h.CallNumber = strings.TrimSpace(cells.Eq(idx).Text())
+		if idx, ok := colMap["callnumber"]; ok && idx < len(cells) {
+			h.CallNumber = strings.TrimSpace(nodeText(cells[idx]))
 		}
-		if idx, ok := colMap["collection"]; ok && idx < cells.Length() {
-			h.Collection = strings.TrimSpace(cells.Eq(idx).Text())
+		if idx, ok := colMap["collection"]; ok && idx < len(cells) {
+			h.Collection = strings.TrimSpace(nodeText(cells[idx]))
 		}
-		if idx, ok := colMap["status"]; ok && idx < cells.Length() {
-			h.Status = strings.TrimSpace(cells.Eq(idx).Text())
+		if idx, ok := colMap["status"]; ok && idx < len(cells) {
+			h.Status = strings.TrimSpace(nodeText(cells[idx]))
 		}
-		if idx, ok := colMap["loandays"]; ok && idx < cells.Length() {
-			text := strings.TrimSpace(cells.Eq(idx).Text())
-			// Extract number from strings like "30 dias"
+		if idx, ok := colMap["loandays"]; ok && idx < len(cells) {
+			text := strings.TrimSpace(nodeText(cells[idx]))
 			text = strings.TrimSuffix(text, " dias")
 			if days, err := strconv.Atoi(text); err == nil {
 				h.LoanDays = days
@@ -306,7 +273,55 @@ func parseHoldings(data []byte) ([]service.Holding, error) {
 		if h.Branch != "" || h.CallNumber != "" {
 			holdings = append(holdings, h)
 		}
-	})
+	}
 
 	return holdings, nil
+}
+
+// findHoldingsHeader walks the HTML tree to find the <tr> header row
+// for the holdings table. It checks direct child cells to avoid matching
+// outer wrapper rows that contain the entire page.
+func findHoldingsHeader(n *html.Node) *html.Node {
+	if n.Type == html.ElementNode && n.Data == "tr" {
+		cells := directCells(n)
+		if len(cells) >= 3 {
+			var texts []string
+			for _, c := range cells {
+				texts = append(texts, strings.TrimSpace(nodeText(c)))
+			}
+			joined := strings.Join(texts, " ")
+			if strings.Contains(joined, "Cota") && (strings.Contains(joined, "Local") || strings.Contains(joined, "Estado")) {
+				return n
+			}
+		}
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if result := findHoldingsHeader(c); result != nil {
+			return result
+		}
+	}
+	return nil
+}
+
+// directCells returns the direct <td> and <th> child elements of a node.
+func directCells(n *html.Node) []*html.Node {
+	var cells []*html.Node
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && (c.Data == "td" || c.Data == "th") {
+			cells = append(cells, c)
+		}
+	}
+	return cells
+}
+
+// nodeText recursively extracts all text content from an HTML node.
+func nodeText(n *html.Node) string {
+	if n.Type == html.TextNode {
+		return n.Data
+	}
+	var sb strings.Builder
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		sb.WriteString(nodeText(c))
+	}
+	return sb.String()
 }
