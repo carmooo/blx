@@ -112,6 +112,7 @@ func itemCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "item <id>",
 		Short: "Show full item details and holdings",
+		Long:  "Show full item details and holdings.\n\nUse single quotes around the ID to avoid shell interpretation:\n  blx item '3100024~!29075~!1'",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			id := args[0]

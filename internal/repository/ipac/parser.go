@@ -202,6 +202,17 @@ func buildAuthor(subs []marcSubfield, role string) service.Author {
 }
 
 // parseHoldings parses iPAC HTML detail page to extract holdings information.
+//
+// The real iPAC HTML structure is:
+//
+//	<table class="tableBackground">
+//	  <tr><td>
+//	    <table>                          ← inner table with actual rows
+//	      <tr> header cells (Local, Cota, Coleção, Prazo empréstimo, Estado, Data Devolução) </tr>
+//	      <tr> data cells </tr>
+//	    </table>
+//	  </td></tr>
+//	</table>
 func parseHoldings(data []byte) ([]service.Holding, error) {
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(data))
 	if err != nil {
@@ -210,85 +221,91 @@ func parseHoldings(data []byte) ([]service.Holding, error) {
 
 	var holdings []service.Holding
 
-	// Find the holdings table by looking for header rows with Portuguese keywords.
-	doc.Find("table").Each(func(_ int, table *goquery.Selection) {
-		if len(holdings) > 0 {
-			return // already found
+	// Find the header row containing holdings column names.
+	// We check direct child cells (not deeply nested text) to avoid matching
+	// outer wrapper rows that contain the entire page.
+	var headerRow *goquery.Selection
+	doc.Find("tr").Each(func(_ int, tr *goquery.Selection) {
+		if headerRow != nil {
+			return
 		}
-
-		// Try to find a header row that identifies the holdings table.
-		colMap := map[string]int{}
-		headerRowIdx := -1
-
-		table.Find("tr").Each(func(rowIdx int, tr *goquery.Selection) {
-			if headerRowIdx >= 0 {
-				return
-			}
-			text := tr.Text()
-			hasLocation := strings.Contains(text, "Localiza")
-			hasCota := strings.Contains(text, "Cota")
-			if hasLocation || hasCota {
-				// Map column positions.
-				tr.Find("td, th").Each(func(colIdx int, cell *goquery.Selection) {
-					cellText := strings.TrimSpace(cell.Text())
-					switch {
-					case strings.Contains(cellText, "Localiza"):
-						colMap["branch"] = colIdx
-					case strings.Contains(cellText, "Cota"):
-						colMap["callnumber"] = colIdx
-					case strings.Contains(cellText, "Cole") || strings.Contains(cellText, "Coleção"):
-						colMap["collection"] = colIdx
-					case strings.Contains(cellText, "Estado") || strings.Contains(cellText, "Situa"):
-						colMap["status"] = colIdx
-					case strings.Contains(cellText, "Empr") || strings.Contains(cellText, "dias"):
-						colMap["loandays"] = colIdx
-					}
-				})
-				if len(colMap) >= 2 {
-					headerRowIdx = rowIdx
-				}
-			}
+		directCells := tr.Children().Filter("td, th")
+		if directCells.Length() < 3 {
+			return
+		}
+		var cellTexts []string
+		directCells.Each(func(_ int, td *goquery.Selection) {
+			cellTexts = append(cellTexts, strings.TrimSpace(td.Text()))
 		})
+		joined := strings.Join(cellTexts, " ")
+		hasCota := strings.Contains(joined, "Cota")
+		hasLocal := strings.Contains(joined, "Local")
+		hasEstado := strings.Contains(joined, "Estado")
+		if hasCota && (hasLocal || hasEstado) {
+			headerRow = tr
+		}
+	})
 
-		if headerRowIdx < 0 {
+	if headerRow == nil {
+		return holdings, nil
+	}
+
+	// Map column positions from header cells (direct children only).
+	colMap := map[string]int{}
+	headerRow.Children().Filter("td, th").Each(func(colIdx int, cell *goquery.Selection) {
+		cellText := strings.TrimSpace(cell.Text())
+		switch {
+		case strings.Contains(cellText, "Local"):
+			colMap["branch"] = colIdx
+		case cellText == "Cota" || strings.HasPrefix(cellText, "Cota"):
+			colMap["callnumber"] = colIdx
+		case strings.Contains(cellText, "Cole"):
+			colMap["collection"] = colIdx
+		case strings.Contains(cellText, "Estado") || strings.Contains(cellText, "Situa"):
+			colMap["status"] = colIdx
+		case strings.Contains(cellText, "Prazo") || strings.Contains(cellText, "Empr"):
+			colMap["loandays"] = colIdx
+		case strings.Contains(cellText, "Devolu"):
+			colMap["duedate"] = colIdx
+		}
+	})
+
+	if len(colMap) < 2 {
+		return holdings, nil
+	}
+
+	// Parse sibling rows after the header (data rows).
+	headerRow.NextAll().Each(func(_ int, tr *goquery.Selection) {
+		cells := tr.Children().Filter("td, th")
+		if cells.Length() < 2 {
 			return
 		}
 
-		// Parse data rows after the header.
-		table.Find("tr").Each(func(rowIdx int, tr *goquery.Selection) {
-			if rowIdx <= headerRowIdx {
-				return
+		h := service.Holding{}
+		if idx, ok := colMap["branch"]; ok && idx < cells.Length() {
+			h.Branch = strings.TrimSpace(cells.Eq(idx).Text())
+		}
+		if idx, ok := colMap["callnumber"]; ok && idx < cells.Length() {
+			h.CallNumber = strings.TrimSpace(cells.Eq(idx).Text())
+		}
+		if idx, ok := colMap["collection"]; ok && idx < cells.Length() {
+			h.Collection = strings.TrimSpace(cells.Eq(idx).Text())
+		}
+		if idx, ok := colMap["status"]; ok && idx < cells.Length() {
+			h.Status = strings.TrimSpace(cells.Eq(idx).Text())
+		}
+		if idx, ok := colMap["loandays"]; ok && idx < cells.Length() {
+			text := strings.TrimSpace(cells.Eq(idx).Text())
+			// Extract number from strings like "30 dias"
+			text = strings.TrimSuffix(text, " dias")
+			if days, err := strconv.Atoi(text); err == nil {
+				h.LoanDays = days
 			}
-			cells := tr.Find("td, th")
-			if cells.Length() == 0 {
-				return
-			}
+		}
 
-			h := service.Holding{}
-			if idx, ok := colMap["branch"]; ok && idx < cells.Length() {
-				h.Branch = strings.TrimSpace(cells.Eq(idx).Text())
-			}
-			if idx, ok := colMap["callnumber"]; ok && idx < cells.Length() {
-				h.CallNumber = strings.TrimSpace(cells.Eq(idx).Text())
-			}
-			if idx, ok := colMap["collection"]; ok && idx < cells.Length() {
-				h.Collection = strings.TrimSpace(cells.Eq(idx).Text())
-			}
-			if idx, ok := colMap["status"]; ok && idx < cells.Length() {
-				h.Status = strings.TrimSpace(cells.Eq(idx).Text())
-			}
-			if idx, ok := colMap["loandays"]; ok && idx < cells.Length() {
-				text := strings.TrimSpace(cells.Eq(idx).Text())
-				if days, err := strconv.Atoi(text); err == nil {
-					h.LoanDays = days
-				}
-			}
-
-			// Only add if we got meaningful data.
-			if h.Branch != "" || h.CallNumber != "" {
-				holdings = append(holdings, h)
-			}
-		})
+		if h.Branch != "" || h.CallNumber != "" {
+			holdings = append(holdings, h)
+		}
 	})
 
 	return holdings, nil
