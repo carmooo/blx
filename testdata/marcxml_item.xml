@@ -1,0 +1,63 @@
+<collection>
+<record type="Bibliographic" format="UNIMARC">
+<leader>02485nam 02000276  04500</leader>
+<controlfield tag="001">1</controlfield>
+<controlfield tag="003">https://catalogolx.cm-lisboa.pt/ipac20/ipac.jsp?&amp;profile=ba&amp;uri=full=3100024~!1~!0</controlfield>
+<datafield ind2=" " ind1=" " tag="100">
+<subfield code="a">19920821d1949    m  a0pory0103    ba</subfield>
+</datafield>
+<datafield ind2="0" ind1=" " tag="101">
+<subfield code="a">ita</subfield>
+<subfield code="f">por</subfield>
+</datafield>
+<datafield ind2=" " ind1=" " tag="102">
+<subfield code="a">PT</subfield>
+</datafield>
+<datafield ind2=" " ind1="1" tag="200">
+<subfield code="a">Relação do reino de Congo e das terras circunvizinhas</subfield>
+<subfield code="f">por Duarte Lopez e Filippo Pigafetta</subfield>
+</datafield>
+<datafield ind2=" " ind1=" " tag="205">
+<subfield code="a">Ed. fac-similada</subfield>
+<subfield code="f">com um pref. de Rosa Capeans</subfield>
+</datafield>
+<datafield ind2=" " ind1=" " tag="210">
+<subfield code="a">Lisboa</subfield>
+<subfield code="c">Agência Geral das Colónias,</subfield>
+<subfield code="d">1949</subfield>
+</datafield>
+<datafield ind2=" " ind1=" " tag="215">
+<subfield code="a">136 p., pag. var.</subfield>
+<subfield code="c">8 grav. desdobr., 2 map. desdobr.</subfield>
+<subfield code="d">25 cm</subfield>
+</datafield>
+<datafield ind2=" " ind1=" " tag="607">
+<subfield code="a">Reino do Congo (Angola e Congo (República Democrática): jur. pass.)</subfield>
+<subfield code="z">Séc. 16</subfield>
+<subfield code="j">[Narrativas de viagens]</subfield>
+<subfield code="2">SIPOR</subfield>
+</datafield>
+<datafield ind2=" " ind1=" " tag="675">
+<subfield code="a">910.4(673+675)"15"</subfield>
+<subfield code="v">BN</subfield>
+<subfield code="z">por</subfield>
+</datafield>
+<datafield ind2="1" ind1=" " tag="700">
+<subfield code="a">Lopes,</subfield>
+<subfield code="b">Duarte,</subfield>
+<subfield code="f">fl. 1578</subfield>
+</datafield>
+<datafield ind2="1" ind1=" " tag="701">
+<subfield code="a">Pigafetta,</subfield>
+<subfield code="b">Filippo,</subfield>
+<subfield code="f">1533-1604</subfield>
+<subfield code="4">070</subfield>
+</datafield>
+<datafield ind2="1" ind1=" " tag="702">
+<subfield code="a">Capeans,</subfield>
+<subfield code="b">Rosa,</subfield>
+<subfield code="f">1894-1985</subfield>
+<subfield code="4">080</subfield>
+</datafield>
+</record>
+</collection>

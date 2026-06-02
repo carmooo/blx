@@ -18,63 +18,65 @@ type SearchParams struct {
 
 // SearchResult is the response from a search.
 type SearchResult struct {
-	Total   int // 0 if unknown
-	Page    int
-	PerPage int
-	Results []SearchItem
+	Total   int          `json:"total,omitempty"`
+	Page    int          `json:"page"`
+	PerPage int          `json:"per_page"`
+	Results []SearchItem `json:"results"`
 }
 
 // SearchItem is a single item in search results (lightweight).
 type SearchItem struct {
-	ID    string
-	Title string
+	ID    string `json:"id"`
+	Title string `json:"title"`
 }
 
 // Item is a full catalog item with all metadata.
 type Item struct {
-	ID             string
-	Title          string
-	Authors        []Author
-	Publisher      string
-	Place          string
-	Year           string
-	Edition        string
-	Physical       string
-	Subjects       []string
-	Classification string
-	Language       string
-	ISBN           string
-	Type           string
-	Holdings       []Holding
+	ID             string    `json:"id"`
+	Title          string    `json:"title"`
+	Authors        []Author  `json:"authors,omitempty"`
+	Publisher      string    `json:"publisher,omitempty"`
+	Place          string    `json:"place,omitempty"`
+	Year           string    `json:"year,omitempty"`
+	Edition        string    `json:"edition,omitempty"`
+	Physical       string    `json:"physical,omitempty"`
+	Subjects       []string  `json:"subjects,omitempty"`
+	Classification string    `json:"classification,omitempty"`
+	Language       string    `json:"language,omitempty"`
+	ISBN           string    `json:"isbn,omitempty"`
+	Type           string    `json:"type,omitempty"`
+	Holdings       []Holding `json:"holdings,omitempty"`
 }
 
 // Author represents an item's author.
 type Author struct {
-	Name  string
-	Dates string
-	Role  string
+	Name  string `json:"name"`
+	Dates string `json:"dates,omitempty"`
+	Role  string `json:"role"`
 }
 
 // Holding represents a copy of an item at a branch.
 type Holding struct {
-	Branch     string
-	BranchCode string
-	CallNumber string
-	Collection string
-	Status     string
-	LoanDays   int
+	Branch     string `json:"branch"`
+	BranchCode string `json:"branch_code,omitempty"`
+	CallNumber string `json:"call_number"`
+	Collection string `json:"collection"`
+	Status     string `json:"status"`
+	LoanDays   int    `json:"loan_days,omitempty"`
+	BibKey     string `json:"bib_key,omitempty"`
+	ItemKey    string `json:"item_key,omitempty"`
 }
 
 // Branch represents a library branch.
 type Branch struct {
-	Code string
-	Name string
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 // FilterOption is a selectable filter value.
 type FilterOption struct {
-	Code string
-	Name string
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 // CatalogRepository is the interface for accessing catalog data.
