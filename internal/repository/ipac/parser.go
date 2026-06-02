@@ -45,19 +45,27 @@ func parseRSS(data []byte) ([]service.SearchItem, error) {
 }
 
 // decodeISO8859 converts ISO-8859-1 bytes to UTF-8.
+// If the data is already valid UTF-8 with multi-byte sequences, it is returned as-is
+// to avoid double-encoding.
 func decodeISO8859(data []byte) ([]byte, error) {
+	if isValidUTF8WithMultibyte(data) {
+		return data, nil
+	}
 	return charmap.ISO8859_1.NewDecoder().Bytes(data)
 }
 
-// hasISO8859Declaration checks if the XML data declares ISO-8859-1 encoding.
-func hasISO8859Declaration(data []byte) bool {
-	// Check the first 100 bytes for the encoding declaration.
-	header := string(data)
-	if len(header) > 100 {
-		header = header[:100]
+// isValidUTF8WithMultibyte returns true if data contains multi-byte UTF-8 sequences,
+// indicating it is already UTF-8 encoded (not ISO-8859-1).
+func isValidUTF8WithMultibyte(data []byte) bool {
+	for i := 0; i < len(data); i++ {
+		if data[i] >= 0xC0 { // start of a multi-byte UTF-8 sequence
+			// Check it's a valid continuation
+			if i+1 < len(data) && data[i+1]&0xC0 == 0x80 {
+				return true
+			}
+		}
 	}
-	header = strings.ToLower(header)
-	return strings.Contains(header, "iso-8859-1") || strings.Contains(header, "iso_8859_1")
+	return false
 }
 
 // stripXMLDeclaration removes the <?xml ...?> processing instruction.
@@ -92,16 +100,13 @@ func extractID(link string) (string, error) {
 }
 
 // parseMarcXML parses MarcXchange XML (UNIMARC format) into a service.Item.
+// Like parseRSS, always decodes from ISO-8859-1 since iPAC sends that encoding.
 func parseMarcXML(data []byte) (*service.Item, error) {
-	cleaned := data
-	if hasISO8859Declaration(data) {
-		utf8Data, err := decodeISO8859(data)
-		if err != nil {
-			return nil, fmt.Errorf("decode ISO-8859-1: %w", err)
-		}
-		cleaned = utf8Data
+	utf8Data, err := decodeISO8859(data)
+	if err != nil {
+		return nil, fmt.Errorf("decode ISO-8859-1: %w", err)
 	}
-	cleaned = stripXMLDeclaration(cleaned)
+	cleaned := stripXMLDeclaration(utf8Data)
 
 	var collection marcCollection
 	if err := xml.Unmarshal(cleaned, &collection); err != nil {

@@ -166,6 +166,14 @@ var sortMapping = map[string]string{
 	"title_az": "3100038",
 }
 
+// escapeIPACID URL-encodes an item ID but leaves ~ and ! unescaped (iPAC requires them literal).
+func escapeIPACID(id string) string {
+	s := url.QueryEscape(id)
+	s = strings.ReplaceAll(s, "%7E", "~")
+	s = strings.ReplaceAll(s, "%21", "!")
+	return s
+}
+
 // Search performs a catalog search and returns results.
 func (r *Repository) Search(ctx context.Context, params service.SearchParams) (*service.SearchResult, error) {
 	index := indexMapping[params.Index]
@@ -229,10 +237,7 @@ func (r *Repository) Search(ctx context.Context, params service.SearchParams) (*
 
 // GetItem retrieves full item metadata by fetching MarcXchange XML.
 func (r *Repository) GetItem(ctx context.Context, id string) (*service.Item, error) {
-	path := "/regiso.jsp?profile=rbml&uri=full=" + url.QueryEscape(id) + "&marcxchange=true"
-	// iPAC expects ~ and ! unescaped.
-	path = strings.ReplaceAll(path, "%7E", "~")
-	path = strings.ReplaceAll(path, "%21", "!")
+	path := "/regiso.jsp?profile=rbml&uri=full=" + escapeIPACID(id) + "&marcxchange=true"
 
 	data, err := r.client.Fetch(ctx, path)
 	if err != nil {
@@ -250,9 +255,7 @@ func (r *Repository) GetItem(ctx context.Context, id string) (*service.Item, err
 
 // GetHoldings retrieves holdings for an item by fetching the HTML detail page.
 func (r *Repository) GetHoldings(ctx context.Context, id string) ([]service.Holding, error) {
-	path := "/ipac.jsp?profile=rbml&uri=full=" + url.QueryEscape(id)
-	path = strings.ReplaceAll(path, "%7E", "~")
-	path = strings.ReplaceAll(path, "%21", "!")
+	path := "/ipac.jsp?profile=rbml&uri=full=" + escapeIPACID(id)
 
 	data, err := r.client.Fetch(ctx, path)
 	if err != nil {

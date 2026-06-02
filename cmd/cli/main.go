@@ -195,7 +195,7 @@ func printItem(item *service.Item) error {
 		for _, h := range item.Holdings {
 			fmt.Fprintf(w, "%s\t%s\t%s\n", h.Branch, h.CallNumber, h.Status)
 		}
-		w.Flush()
+		return w.Flush()
 	}
 
 	return nil
