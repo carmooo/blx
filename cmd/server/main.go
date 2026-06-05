@@ -2,10 +2,35 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
 	"os"
+	"time"
+
+	"github.com/joao-carmo/blx/internal/handler"
+	"github.com/joao-carmo/blx/internal/repository/ipac"
 )
 
 func main() {
-	fmt.Println("blx server")
-	os.Exit(0)
+	addr := os.Getenv("BLX_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+
+	client := ipac.NewClient()
+	repo := ipac.NewRepository(client)
+	h := handler.New(repo)
+
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      h,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	fmt.Printf("blx server listening on %s\n", addr)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatal(err)
+	}
 }
