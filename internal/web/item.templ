@@ -1,0 +1,90 @@
+package web
+
+import "github.com/joao-carmo/blx/internal/service"
+import "strings"
+
+templ ItemPage(item *service.Item) {
+	@Layout(item.Title) {
+		<div class="item-detail">
+			<h2>{ item.Title }</h2>
+			<dl class="item-meta">
+				if len(item.Authors) > 0 {
+					<dt>Autores</dt>
+					<dd>{ joinAuthors(item.Authors) }</dd>
+				}
+				if item.Publisher != "" {
+					<dt>Editor</dt>
+					<dd>
+						{ item.Publisher }
+						if item.Year != "" {
+							, { item.Year }
+						}
+					</dd>
+				}
+				if item.ISBN != "" {
+					<dt>ISBN</dt>
+					<dd>{ item.ISBN }</dd>
+				}
+				if item.Language != "" {
+					<dt>Língua</dt>
+					<dd>{ item.Language }</dd>
+				}
+				if item.Edition != "" {
+					<dt>Edição</dt>
+					<dd>{ item.Edition }</dd>
+				}
+				if item.Physical != "" {
+					<dt>Descrição</dt>
+					<dd>{ item.Physical }</dd>
+				}
+				if len(item.Subjects) > 0 {
+					<dt>Assuntos</dt>
+					<dd>{ strings.Join(item.Subjects, " ; ") }</dd>
+				}
+				if item.Classification != "" {
+					<dt>CDU</dt>
+					<dd>{ item.Classification }</dd>
+				}
+			</dl>
+			if len(item.Holdings) > 0 {
+				<h3 style="margin-bottom: 0.5rem; color: #4a5568;">Exemplares</h3>
+				<table class="holdings-table">
+					<thead>
+						<tr>
+							<th>Biblioteca</th>
+							<th>Cota</th>
+							<th>Coleção</th>
+							<th>Estado</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, h := range item.Holdings {
+							<tr>
+								<td>{ h.Branch }</td>
+								<td>{ h.CallNumber }</td>
+								<td>{ h.Collection }</td>
+								<td class={ holdingStatusClass(h.Status) }>{ h.Status }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
+		</div>
+	}
+}
+
+func joinAuthors(authors []service.Author) string {
+	names := make([]string, len(authors))
+	for i, a := range authors {
+		names[i] = a.Name
+	}
+	return strings.Join(names, " ; ")
+}
+
+func holdingStatusClass(status string) string {
+	lower := strings.ToLower(status)
+	if strings.Contains(lower, "disponível") || strings.Contains(lower, "available") {
+		return "status-available"
+	}
+	return "status-unavailable"
+}
