@@ -1,52 +1,35 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/joao-carmo/blx/internal/handler/mocks"
 	"github.com/joao-carmo/blx/internal/service"
 )
 
-type mockRepo struct {
-	searchResult *service.SearchResult
-	searchErr    error
-	item         *service.Item
-	itemErr      error
-	holdings     []service.Holding
-	holdingsErr  error
-}
-
-func (m *mockRepo) Search(_ context.Context, _ service.SearchParams) (*service.SearchResult, error) {
-	return m.searchResult, m.searchErr
-}
-
-func (m *mockRepo) GetItem(_ context.Context, _ string) (*service.Item, error) {
-	return m.item, m.itemErr
-}
-
-func (m *mockRepo) GetHoldings(_ context.Context, _ string) ([]service.Holding, error) {
-	return m.holdings, m.holdingsErr
-}
-
 func TestSearchHandler(t *testing.T) {
-	repo := &mockRepo{
-		searchResult: &service.SearchResult{
+	svc := mocks.NewMockCatalogService(t)
+	svc.EXPECT().
+		Search(mock.Anything, mock.MatchedBy(func(p service.SearchParams) bool {
+			return p.Query == "test"
+		})).
+		Return(&service.SearchResult{
 			Total:   1,
 			Page:    1,
 			PerPage: 20,
 			Results: []service.SearchItem{
 				{ID: "123", Title: "Test Book"},
 			},
-		},
-	}
+		}, nil)
 
-	h := New(repo)
+	h := New(svc)
 	req := httptest.NewRequest(http.MethodGet, "/api/items/search?q=test", nil)
 	rec := httptest.NewRecorder()
 
@@ -64,7 +47,9 @@ func TestSearchHandler(t *testing.T) {
 }
 
 func TestSearchHandlerMissingQuery(t *testing.T) {
-	h := New(&mockRepo{})
+	svc := mocks.NewMockCatalogService(t)
+
+	h := New(svc)
 	req := httptest.NewRequest(http.MethodGet, "/api/items/search", nil)
 	rec := httptest.NewRecorder()
 
@@ -78,23 +63,24 @@ func TestSearchHandlerMissingQuery(t *testing.T) {
 }
 
 func TestItemHandler(t *testing.T) {
-	repo := &mockRepo{
-		item: &service.Item{
+	svc := mocks.NewMockCatalogService(t)
+	svc.EXPECT().
+		GetItem(mock.Anything, "test-id").
+		Return(&service.Item{
 			ID:    "test-id",
 			Title: "Test Book",
-		},
-		holdings: []service.Holding{
-			{
-				Branch:     "Central Library",
-				BranchCode: "CMLBC4",
-				CallNumber: "821.134.3",
-				Collection: "General",
-				Status:     "Available",
+			Holdings: []service.Holding{
+				{
+					Branch:     "Central Library",
+					BranchCode: "CMLBC4",
+					CallNumber: "821.134.3",
+					Collection: "General",
+					Status:     "Available",
+				},
 			},
-		},
-	}
+		}, nil)
 
-	h := New(repo)
+	h := New(svc)
 	req := httptest.NewRequest(http.MethodGet, "/api/items/test-id", nil)
 	rec := httptest.NewRecorder()
 

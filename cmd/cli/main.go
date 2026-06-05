@@ -53,6 +53,7 @@ func searchCmd() *cobra.Command {
 
 			client := ipac.NewClient()
 			repo := ipac.NewRepository(client)
+			svc := service.NewCatalogService(repo)
 
 			params := service.SearchParams{
 				Query:    query,
@@ -63,7 +64,7 @@ func searchCmd() *cobra.Command {
 				Page:     page,
 			}
 
-			result, err := repo.Search(ctx, params)
+			result, err := svc.Search(ctx, params)
 			if err != nil {
 				return fmt.Errorf("search failed: %w", err)
 			}
@@ -122,17 +123,12 @@ func itemCmd() *cobra.Command {
 
 			client := ipac.NewClient()
 			repo := ipac.NewRepository(client)
+			svc := service.NewCatalogService(repo)
 
-			item, err := repo.GetItem(ctx, id)
+			item, err := svc.GetItem(ctx, id)
 			if err != nil {
 				return fmt.Errorf("get item: %w", err)
 			}
-
-			holdings, err := repo.GetHoldings(ctx, id)
-			if err != nil {
-				return fmt.Errorf("get holdings: %w", err)
-			}
-			item.Holdings = holdings
 
 			if jsonOut {
 				return printJSON(item)

@@ -5,3 +5,6 @@ packages:
   github.com/joao-carmo/blx/internal/service:
     interfaces:
       CatalogRepository:
+  github.com/joao-carmo/blx/internal/handler:
+    interfaces:
+      CatalogService:
