@@ -1,7 +1,9 @@
 # Binaries
 /blx
+/blx-server
 /cli
 *.exe
+/tmp/
 
 # IDE
 .idea/

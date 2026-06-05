@@ -1,0 +1,9 @@
+[build]
+cmd = "templ generate && go build -o ./tmp/blx-server ./cmd/server/"
+bin = "tmp/blx-server"
+include_ext = ["go", "templ"]
+exclude_dir = ["tmp", "testdata", "localdev"]
+exclude_regex = ["_templ\\.go$"]
+
+[build.env]
+BLX_ADDR = ":3000"
