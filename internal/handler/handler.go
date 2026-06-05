@@ -103,7 +103,7 @@ type errorBody struct {
 func writeError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(apiError{
+	_ = json.NewEncoder(w).Encode(apiError{
 		Error: errorBody{Code: code, Message: message},
 	})
 }
@@ -111,11 +111,11 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 func writeSearchResult(w http.ResponseWriter, status int, result *service.SearchResult) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(result)
+	_ = json.NewEncoder(w).Encode(result)
 }
 
 func writeItem(w http.ResponseWriter, status int, item *service.Item) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(item)
+	_ = json.NewEncoder(w).Encode(item)
 }

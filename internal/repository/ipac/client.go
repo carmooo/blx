@@ -99,10 +99,13 @@ func (c *Client) Fetch(ctx context.Context, path string) ([]byte, error) {
 			return nil, fmt.Errorf("do request: %w", err)
 		}
 
-		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return nil, fmt.Errorf("read body: %w", err)
+		body, readErr := io.ReadAll(resp.Body)
+		closeErr := resp.Body.Close()
+		if readErr != nil {
+			return nil, fmt.Errorf("read body: %w", readErr)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("close body: %w", closeErr)
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests {

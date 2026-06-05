@@ -17,7 +17,7 @@ import (
 
 func TestClient_Fetch_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Write([]byte("hello"))
+		_, _ = w.Write([]byte("hello"))
 	}))
 	defer srv.Close()
 
@@ -42,7 +42,7 @@ func TestClient_Fetch_ConcurrencyLimit(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 		concurrent.Add(-1)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	}))
 	defer srv.Close()
 
@@ -76,7 +76,7 @@ func TestClient_Fetch_RetryOn429(t *testing.T) {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	}))
 	defer srv.Close()
 
@@ -90,7 +90,7 @@ func TestClient_Fetch_RetryOn429(t *testing.T) {
 func TestClient_Fetch_ContextCancellation(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(5 * time.Second)
-		w.Write([]byte("slow"))
+		_, _ = w.Write([]byte("slow"))
 	}))
 	defer srv.Close()
 
@@ -119,7 +119,7 @@ func TestRepository_Search_URLConstruction(t *testing.T) {
 	var receivedPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedPath = r.URL.RequestURI()
-		w.Write([]byte(`<rss version="2.0"><channel><title>Test</title></channel></rss>`))
+		_, _ = w.Write([]byte(`<rss version="2.0"><channel><title>Test</title></channel></rss>`))
 	}))
 	defer srv.Close()
 
@@ -144,7 +144,7 @@ func TestRepository_GetItem(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.RequestURI(), "regiso.jsp")
 		assert.Contains(t, r.URL.RequestURI(), "marcxchange=true")
-		w.Write(fixture)
+		_, _ = w.Write(fixture)
 	}))
 	defer srv.Close()
 
@@ -167,7 +167,7 @@ func TestRepository_GetHoldings(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Contains(t, r.URL.RequestURI(), "ipac.jsp")
 		assert.Contains(t, r.URL.RequestURI(), "profile=rbml")
-		w.Write(fixture)
+		_, _ = w.Write(fixture)
 	}))
 	defer srv.Close()
 
