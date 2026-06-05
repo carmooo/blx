@@ -9,24 +9,23 @@ import (
 	"github.com/joao-carmo/blx/internal/service"
 )
 
-// CatalogRepository defines the catalog operations needed by the handler.
-type CatalogRepository interface {
+// CatalogService defines the operations needed by the handler.
+type CatalogService interface {
 	Search(ctx context.Context, params service.SearchParams) (*service.SearchResult, error)
 	GetItem(ctx context.Context, id string) (*service.Item, error)
-	GetHoldings(ctx context.Context, id string) ([]service.Holding, error)
 }
 
 // Handler serves the BLX HTTP API.
 type Handler struct {
-	repo CatalogRepository
-	mux  *http.ServeMux
+	svc CatalogService
+	mux *http.ServeMux
 }
 
 // New creates a new Handler with routes registered.
-func New(repo CatalogRepository) *Handler {
+func New(svc CatalogService) *Handler {
 	h := &Handler{
-		repo: repo,
-		mux:  http.NewServeMux(),
+		svc: svc,
+		mux: http.NewServeMux(),
 	}
 	h.mux.HandleFunc("GET /api/items/search", h.handleSearch)
 	h.mux.HandleFunc("GET /api/items/{id...}", h.handleItem)
@@ -67,7 +66,7 @@ func (h *Handler) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	result, err := h.repo.Search(r.Context(), params)
+	result, err := h.svc.Search(r.Context(), params)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "search_failed", "could not search catalog")
 		return
@@ -83,18 +82,11 @@ func (h *Handler) handleItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item, err := h.repo.GetItem(r.Context(), id)
+	item, err := h.svc.GetItem(r.Context(), id)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "get_item_failed", "could not get item")
 		return
 	}
-
-	holdings, err := h.repo.GetHoldings(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "get_holdings_failed", "could not get holdings")
-		return
-	}
-	item.Holdings = holdings
 
 	writeItem(w, http.StatusOK, item)
 }

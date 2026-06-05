@@ -9,6 +9,7 @@ import (
 
 	"github.com/joao-carmo/blx/internal/handler"
 	"github.com/joao-carmo/blx/internal/repository/ipac"
+	"github.com/joao-carmo/blx/internal/service"
 )
 
 func main() {
@@ -19,7 +20,8 @@ func main() {
 
 	client := ipac.NewClient()
 	repo := ipac.NewRepository(client)
-	h := handler.New(repo)
+	svc := service.NewCatalogService(repo)
+	h := handler.New(svc)
 
 	server := &http.Server{
 		Addr:         addr,
