@@ -93,10 +93,10 @@ func printTable(result *service.SearchResult) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tTITLE")
-	fmt.Fprintln(w, "--\t-----")
+	_, _ = fmt.Fprintln(w, "ID\tTITLE")
+	_, _ = fmt.Fprintln(w, "--\t-----")
 	for _, item := range result.Results {
-		fmt.Fprintf(w, "%s\t%s\n", item.ID, item.Title)
+		_, _ = fmt.Fprintf(w, "%s\t%s\n", item.ID, item.Title)
 	}
 	return w.Flush()
 }
@@ -187,10 +187,10 @@ func printItem(item *service.Item) error {
 		fmt.Println()
 		fmt.Println("Holdings:")
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "BRANCH\tCALL NUMBER\tSTATUS")
-		fmt.Fprintln(w, "------\t-----------\t------")
+		_, _ = fmt.Fprintln(w, "BRANCH\tCALL NUMBER\tSTATUS")
+		_, _ = fmt.Fprintln(w, "------\t-----------\t------")
 		for _, h := range item.Holdings {
-			fmt.Fprintf(w, "%s\t%s\t%s\n", h.Branch, h.CallNumber, h.Status)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\n", h.Branch, h.CallNumber, h.Status)
 		}
 		return w.Flush()
 	}
