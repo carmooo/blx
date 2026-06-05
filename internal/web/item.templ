@@ -5,15 +5,17 @@ import "strings"
 
 templ ItemPage(item *service.Item) {
 	@Layout(item.Title) {
-		<div class="item-detail">
-			<h2>{ item.Title }</h2>
-			<dl class="item-meta">
+		<article>
+			<header>
+				<h2>{ item.Title }</h2>
+			</header>
+			<dl>
 				if len(item.Authors) > 0 {
-					<dt>Autores</dt>
+					<dt><strong>Autores</strong></dt>
 					<dd>{ joinAuthors(item.Authors) }</dd>
 				}
 				if item.Publisher != "" {
-					<dt>Editor</dt>
+					<dt><strong>Editor</strong></dt>
 					<dd>
 						{ item.Publisher }
 						if item.Year != "" {
@@ -22,33 +24,33 @@ templ ItemPage(item *service.Item) {
 					</dd>
 				}
 				if item.ISBN != "" {
-					<dt>ISBN</dt>
+					<dt><strong>ISBN</strong></dt>
 					<dd>{ item.ISBN }</dd>
 				}
 				if item.Language != "" {
-					<dt>Língua</dt>
+					<dt><strong>Língua</strong></dt>
 					<dd>{ item.Language }</dd>
 				}
 				if item.Edition != "" {
-					<dt>Edição</dt>
+					<dt><strong>Edição</strong></dt>
 					<dd>{ item.Edition }</dd>
 				}
 				if item.Physical != "" {
-					<dt>Descrição</dt>
+					<dt><strong>Descrição</strong></dt>
 					<dd>{ item.Physical }</dd>
 				}
 				if len(item.Subjects) > 0 {
-					<dt>Assuntos</dt>
+					<dt><strong>Assuntos</strong></dt>
 					<dd>{ strings.Join(item.Subjects, " ; ") }</dd>
 				}
 				if item.Classification != "" {
-					<dt>CDU</dt>
+					<dt><strong>CDU</strong></dt>
 					<dd>{ item.Classification }</dd>
 				}
 			</dl>
 			if len(item.Holdings) > 0 {
-				<h3 style="margin-bottom: 0.5rem; color: #4a5568;">Exemplares</h3>
-				<table class="holdings-table">
+				<h3>Exemplares</h3>
+				<table>
 					<thead>
 						<tr>
 							<th>Biblioteca</th>
@@ -63,13 +65,13 @@ templ ItemPage(item *service.Item) {
 								<td>{ h.Branch }</td>
 								<td>{ h.CallNumber }</td>
 								<td>{ h.Collection }</td>
-								<td class={ holdingStatusClass(h.Status) }>{ h.Status }</td>
+								<td>{ h.Status }</td>
 							</tr>
 						}
 					</tbody>
 				</table>
 			}
-		</div>
+		</article>
 	}
 }
 
@@ -79,12 +81,4 @@ func joinAuthors(authors []service.Author) string {
 		names[i] = a.Name
 	}
 	return strings.Join(names, " ; ")
-}
-
-func holdingStatusClass(status string) string {
-	lower := strings.ToLower(status)
-	if strings.Contains(lower, "disponível") || strings.Contains(lower, "available") {
-		return "status-available"
-	}
-	return "status-unavailable"
 }

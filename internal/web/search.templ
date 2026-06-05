@@ -5,32 +5,27 @@ import "fmt"
 
 templ SearchPage(query string) {
 	@Layout("Pesquisa") {
-		<div class="search-box">
-			<form class="search-form"
+		<article>
+			<form role="search"
 				hx-get="/search"
 				hx-target="#results"
 				hx-indicator="#loading">
 				<input
-					class="search-input"
 					type="search"
 					name="q"
 					placeholder="Pesquisar livros, autores, assuntos..."
 					value={ query }
 					autofocus
 				/>
-				<button class="search-btn" type="submit">Pesquisar</button>
+				<button type="submit">Pesquisar</button>
 			</form>
-		</div>
-		<div id="loading" class="loading htmx-indicator">A pesquisar...</div>
-		<div id="results">
-			if query != "" {
-				<div class="loading">A pesquisar...</div>
-			}
-		</div>
+		</article>
+		<div id="loading" aria-busy="true" style="display:none;text-align:center">A pesquisar...</div>
+		<div id="results"></div>
 		if query != "" {
 			<script>
 				document.addEventListener("DOMContentLoaded", function() {
-					htmx.ajax("GET", "/search?q=" + encodeURIComponent(document.querySelector(".search-input").value), {target: "#results"});
+					htmx.ajax("GET", "/search?q=" + encodeURIComponent(document.querySelector("input[type=search]").value), {target: "#results"});
 				});
 			</script>
 		}
@@ -39,17 +34,14 @@ templ SearchPage(query string) {
 
 templ SearchResults(results []service.SearchItem) {
 	if len(results) == 0 {
-		<div class="no-results">
-			<p>Nenhum resultado encontrado.</p>
-		</div>
+		<p>Nenhum resultado encontrado.</p>
 	} else {
 		for _, item := range results {
-			<div class="result-item">
+			<article>
 				<a href={ templ.URL(fmt.Sprintf("/item/%s", item.ID)) }>
 					{ item.Title }
 				</a>
-				<div class="result-id">{ item.ID }</div>
-			</div>
+			</article>
 		}
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/joao-carmo/blx/internal/handler"
 	"github.com/joao-carmo/blx/internal/repository/ipac"
 	"github.com/joao-carmo/blx/internal/service"
+	"github.com/joao-carmo/blx/internal/web"
 )
 
 func main() {
@@ -21,11 +22,14 @@ func main() {
 	client := ipac.NewClient()
 	repo := ipac.NewRepository(client)
 	svc := service.NewCatalogService(repo)
-	h := handler.New(svc)
+
+	mux := http.NewServeMux()
+	mux.Handle("/api/", handler.New(svc))
+	mux.Handle("/", web.New(svc))
 
 	server := &http.Server{
 		Addr:         addr,
-		Handler:      h,
+		Handler:      mux,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
